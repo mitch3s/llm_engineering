@@ -1,0 +1,66 @@
+
+use std::thread;
+use std::time::Instant;
+
+// Calculates a sum over a specific range of iterations.
+// This function is designed to be executed in a separate thread.
+fn calculate_chunk(start: usize, end: usize) -> f64 {
+    let mut local_sum = 0.0_f64;
+    // Optimization: Pre-calculate the base term to replace a multiplication
+    // with an addition inside the loop's hot path.
+    let mut term_base = 4.0 * start as f64;
+
+    for _ in start..=end {
+        // This calculation is equivalent to the Python code's:
+        // result += 1.0 / (4.0*i + 1.0) - 1.0 / (4.0*i - 1.0)
+        local_sum += 1.0 / (term_base + 1.0) - 1.0 / (term_base - 1.0);
+        term_base += 4.0;
+    }
+    local_sum
+}
+
+// Orchestrates parallel execution of the calculation.
+fn calculate_parallel(iterations: usize) -> f64 {
+    // Use all available CPU cores for maximum parallelism.
+    // Fallback to 1 thread if detection fails.
+    let num_threads = thread::available_parallelism().map_or(1, |n| n.get());
+    
+    // Divide the work into chunks for each thread. Using ceiling division
+    // ensures all iterations are covered.
+    let chunk_size = (iterations + num_threads - 1) / num_threads;
+
+    let mut handles = Vec::with_capacity(num_threads);
+
+    // Spawn a thread for each chunk of work.
+    for i in 0..num_threads {
+        let start = i * chunk_size + 1;
+        if start > iterations {
+            break; // No more work to distribute.
+        }
+        let end = (start + chunk_size - 1).min(iterations);
+
+        handles.push(thread::spawn(move || calculate_chunk(start, end)));
+    }
+
+    // Wait for all threads to finish and collect their partial sums.
+    let partial_sums: f64 = handles.into_iter().map(|h| h.join().unwrap()).sum();
+    
+    // The Python code initializes result = 1.0, and the loop subtracts/adds terms.
+    // This is equivalent to 1.0 plus the sum of all term pairs.
+    1.0 + partial_sums
+}
+
+fn main() {
+    let iterations = 200_000_000;
+
+    let start_time = Instant::now();
+    
+    // Perform the calculation and multiply by 4, matching the Python script.
+    let result = calculate_parallel(iterations) * 4.0;
+    
+    let end_time = start_time.elapsed();
+
+    // Print the results in the same format as the Python script.
+    println!("Result: {:.12}", result);
+    println!("Execution Time: {:.6} seconds", end_time.as_secs_f64());
+}

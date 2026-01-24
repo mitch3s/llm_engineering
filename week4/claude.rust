@@ -1,0 +1,26 @@
+
+use std::time::Instant;
+
+fn calculate(iterations: i32, param1: i32, param2: i32) -> f64 {
+    let mut result = 1.0;
+    let param1_f64 = param1 as f64;
+    let param2_f64 = param2 as f64;
+    
+    for i in 1..=iterations {
+        let i_f64 = i as f64;
+        let j1 = i_f64 * param1_f64 - param2_f64;
+        result -= 1.0 / j1;
+        let j2 = i_f64 * param1_f64 + param2_f64;
+        result += 1.0 / j2;
+    }
+    result
+}
+
+fn main() {
+    let start_time = Instant::now();
+    let result = calculate(200_000_000, 4, 1) * 4.0;
+    let end_time = start_time.elapsed();
+
+    println!("Result: {:.12}", result);
+    println!("Execution Time: {:.6} seconds", end_time.as_secs_f64());
+}
